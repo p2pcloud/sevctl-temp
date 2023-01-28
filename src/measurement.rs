@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use std::path::{Path, PathBuf};
+use std::{
+    num::ParseIntError,
+    path::{Path, PathBuf},
+};
 
 use structopt::StructOpt;
 
@@ -41,10 +44,10 @@ pub struct BuildArgs {
 
     #[structopt(long, help = "Path to firmware/OVMF binary")]
     pub firmware: Option<PathBuf>,
-    #[structopt(long, help = "Path to kernel")]
-    pub kernel: Option<PathBuf>,
-    #[structopt(long, help = "Path to initrd")]
-    pub initrd: Option<PathBuf>,
+    #[structopt(long, help = "Kernel hash")]
+    pub kernel: Option<String>,
+    #[structopt(long, help = "Initrd hash")]
+    pub initrd: Option<String>,
     #[structopt(long, help = "Kernel commandline")]
     pub cmdline: Option<String>,
 
@@ -139,14 +142,36 @@ fn build_kernel_table(args: &BuildArgs) -> super::Result<Vec<u8>> {
         sha256_bytes(&cmdline_bytes, "cmdline")?,
         entry_size,
     )?);
-    payload.extend(build_entry(initrd_uuid, sha256_path(initrd)?, entry_size)?);
-    payload.extend(build_entry(kernel_uuid, sha256_path(kernel)?, entry_size)?);
+
+    let initrd_hash_decoded = decode_hex(initrd);
+    let initrd_hash_decoded = match initrd_hash_decoded {
+        Ok(v) => v,
+        Err(e) => return Err(anyhow::anyhow!("failed to decode initrd hash: {}", e)),
+    };
+    payload.extend(build_entry(initrd_uuid, initrd_hash_decoded, entry_size)?);
+
+    let kernel_hash_decoded = decode_hex(kernel);
+    let kernel_hash_decoded = match kernel_hash_decoded {
+        Ok(v) => v,
+        Err(e) => return Err(anyhow::anyhow!("failed to decode kernel hash: {}", e)),
+    };
+
+    payload.extend(build_entry(kernel_uuid, kernel_hash_decoded, entry_size)?);
+
     sha256_bytes(&payload, "table payload")?;
 
     let table = build_table(table_uuid, payload, entry_size)?;
 
     sha256_bytes(&table, "table")?;
     Ok(table)
+}
+
+//https://stackoverflow.com/questions/52987181/how-can-i-convert-a-hex-string-to-a-u8-slice
+pub fn decode_hex(s: &str) -> Result<Vec<u8>, ParseIntError> {
+    (0..s.len())
+        .step_by(2)
+        .map(|i| u8::from_str_radix(&s[i..i + 2], 16))
+        .collect()
 }
 
 fn build_cpu_state(args: &BuildArgs, policy: &u32) -> super::Result<Vec<u8>> {

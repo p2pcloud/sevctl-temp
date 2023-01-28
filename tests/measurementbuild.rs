@@ -146,8 +146,8 @@ fn measurement_build() {
 
     // Test --firmware + --kernel everything
     let args_kernel = BuildArgs {
-        kernel: Some("tests/data/measurement/vmlinuz-fake"),
-        initrd: Some("tests/data/measurement/initrd-fake"),
+        kernel: Some("af609b31eca2942fc46ed7209c7704771cfc2c91750ff4cb899be39b371b4e48"), //tests/data/measurement/vmlinuz-fake
+        initrd: Some("76fa1a19324945ce9b1ee17f211ca5b55cbb74d0368eecce53932a1fddc8e8cb"), //tests/data/measurement/initrd-fake
         cmdline: Some("foo bar baz fake kernel=cmdline"),
         ..args_firmware
     };
